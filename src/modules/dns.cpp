@@ -8,6 +8,7 @@
 #include <core/sdbus.hpp>
 
 // logging
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <sysrepo.h>
@@ -858,6 +859,48 @@ srpc::DatastoreValuesCheckStatus DnsServerValuesChecker::checkDatastoreValues(sy
 {
     srpc::DatastoreValuesCheckStatus status;
     return status;
+}
+
+void DnsServerValueApplier::applyDatastoreValues(sysrepo::Session& session)
+{
+    auto dns_server_node = session.getData("/ietf-system:system/dns-resolver/server");
+    ietf::sys::dns::DnsServerList servers;
+
+    try {
+        servers.loadFromSystem();
+
+        while (dns_server_node) {
+            auto name_node = dns_server_node->findPath("name");
+            const auto address_node = dns_server_node->findPath("udp-and-tcp/address");
+            const auto port_node = dns_server_node->findPath("port");
+
+            const auto name = std::get<std::string>(name_node->asTerm().value());
+            const auto address = std::get<std::string>(address_node->asTerm().value());
+            const auto port = std::get<uint16_t>(port_node->asTerm().value());
+
+            // const auto it = servers.m_findServer(name);
+
+            if (!servers.containsServer(name)) {
+                servers.createServer(name, address, port);
+            }
+
+            dns_server_node = dns_server_node->nextSibling();
+        }
+    } catch (const std::runtime_error& err) {
+        SRPLG_LOG_ERR(getModuleLogPrefix(), "Unable to load DNS server list from the system: %s", err.what());
+    }
+}
+
+/**
+ * @brief Helper function for finding DNS server by the provided name.
+ *
+ * @param name Name to use for search.
+ *
+ * @return Iterator pointing to the DNS server with the provided name.
+ */
+std::optional<std::list<ietf::sys::dns::DnsServer>::iterator> ietf::sys::dns::DnsServerList::containsServer(const std::string& name)
+{
+    return m_findServer(name);
 }
 
 /**

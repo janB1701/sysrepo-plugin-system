@@ -109,6 +109,15 @@ public:
     void deleteServer(const std::string& name);
 
     /**
+     * @brief Helper function for finding DNS server by the provided name.
+     *
+     * @param name Name to use for search.
+     *
+     * @return Iterator pointing to the DNS server with the provided name.
+     */
+    std::optional<std::list<ietf::sys::dns::DnsServer>::iterator> containsServer(const std::string& name);
+
+    /**
      * @brief Get iterator to the beginning.
      */
     auto begin() { return m_servers.begin(); }
