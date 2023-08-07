@@ -10,6 +10,7 @@
 // logging
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <sysrepo.h>
 
@@ -863,6 +864,7 @@ srpc::DatastoreValuesCheckStatus DnsServerValuesChecker::checkDatastoreValues(sy
 
 void DnsServerValueApplier::applyDatastoreValues(sysrepo::Session& session)
 {
+    sr::ErrorCode error = sr::ErrorCode::Ok;
     auto dns_server_node = session.getData("/ietf-system:system/dns-resolver/server");
     ietf::sys::dns::DnsServerList servers;
 
@@ -879,9 +881,14 @@ void DnsServerValueApplier::applyDatastoreValues(sysrepo::Session& session)
             const auto port = std::get<uint16_t>(port_node->asTerm().value());
 
             // const auto it = servers.m_findServer(name);
-
-            if (!servers.containsServer(name)) {
-                servers.createServer(name, address, port);
+            std::optional<std::list<ietf::sys::dns::DnsServer>::iterator> containsSer = servers.containsServer(name);
+            if (containsSer == std::nullopt) {
+                try {
+                    servers.createServer(name, address, port);
+                } catch (const std::runtime_error& err) {
+                    SRPLG_LOG_ERR(getModuleLogPrefix(), "Unable to create a new DNS server (%s)", err.what());
+                    error = sr::ErrorCode::OperationFailed;
+                }
             }
 
             dns_server_node = dns_server_node->nextSibling();
